@@ -21,6 +21,7 @@
 #include "guilib/guiinfo/GUIInfo.h"
 #include "guilib/guiinfo/GUIInfoHelper.h"
 #include "guilib/guiinfo/GUIInfoLabels.h"
+#include "music/MusicFileItemClassify.h"
 #include "music/MusicInfoLoader.h"
 #include "music/MusicThumbLoader.h"
 #include "music/tags/MusicInfoTag.h"
@@ -30,6 +31,7 @@
 #include "utils/URIUtils.h"
 #include "utils/log.h"
 
+using namespace KODI;
 using namespace KODI::GUILIB;
 using namespace KODI::GUILIB::GUIINFO;
 using namespace MUSIC_INFO;
@@ -38,7 +40,7 @@ bool CMusicGUIInfo::InitCurrentItem(CFileItem *item)
 {
   const auto& components = CServiceBroker::GetAppComponents();
   const auto appPlayer = components.GetComponent<CApplicationPlayer>();
-  if (item && (item->IsAudio() || (item->IsInternetStream() && appPlayer->IsPlayingAudio())))
+  if (item && (MUSIC::IsAudio(*item) || (item->IsInternetStream() && appPlayer->IsPlayingAudio())))
   {
     CLog::Log(LOGDEBUG, "CMusicGUIInfo::InitCurrentItem({})", item->GetPath());
 
@@ -48,7 +50,7 @@ bool CMusicGUIInfo::InitCurrentItem(CFileItem *item)
     tag->SetLoaded(true);
 
     // find a thumb for this file.
-    if (item->IsInternetStream() && !item->IsMusicDb())
+    if (item->IsInternetStream() && !MUSIC::IsMusicDb(*item))
     {
       if (!g_application.m_strPlayListFile.empty())
       {
@@ -356,7 +358,7 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
         return true;
       case LISTITEM_FILENAME:
       case LISTITEM_FILE_EXTENSION:
-        if (item->IsMusicDb())
+        if (MUSIC::IsMusicDb(*item))
           value = URIUtils::GetFileName(tag->GetURL());
         else if (item->HasVideoInfoTag()) // special handling for music videos, which have both a videotag and a musictag
           break;
@@ -371,7 +373,7 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
         return true;
       case LISTITEM_FOLDERNAME:
       case LISTITEM_PATH:
-        if (item->IsMusicDb())
+        if (MUSIC::IsMusicDb(*item))
           value = URIUtils::GetDirectory(tag->GetURL());
         else if (item->HasVideoInfoTag()) // special handling for music videos, which have both a videotag and a musictag
           break;
@@ -387,7 +389,7 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
         }
         return true;
       case LISTITEM_FILENAME_AND_PATH:
-        if (item->IsMusicDb())
+        if (MUSIC::IsMusicDb(*item))
           value = tag->GetURL();
         else if (item->HasVideoInfoTag()) // special handling for music videos, which have both a videotag and a musictag
           break;
@@ -403,6 +405,9 @@ bool CMusicGUIInfo::GetLabel(std::string& value, const CFileItem *item, int cont
           return true;
         }
         break;
+      case LISTITEM_SONG_VIDEO_URL:
+        value = tag->GetSongVideoURL();
+        return true;
     }
   }
 
@@ -551,7 +556,7 @@ bool CMusicGUIInfo::GetPlaylistInfo(std::string& value, const CGUIInfo &info) co
     if (CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist() != PLAYLIST::TYPE_MUSIC)
       return false;
 
-    index = CServiceBroker::GetPlaylistPlayer().GetNextSong(index);
+    index = CServiceBroker::GetPlaylistPlayer().GetNextItemIdx(index);
   }
 
   if (index < 0 || index >= playlist.size())
@@ -640,7 +645,7 @@ bool CMusicGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int contextW
       // requires current playlist be TYPE_MUSIC
       if (CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist() == PLAYLIST::TYPE_MUSIC)
       {
-        value = (CServiceBroker::GetPlaylistPlayer().GetCurrentSong() > 0); // not first song
+        value = (CServiceBroker::GetPlaylistPlayer().GetCurrentItemIdx() > 0); // not first song
         return true;
       }
       break;
@@ -648,7 +653,7 @@ bool CMusicGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int contextW
       // requires current playlist be TYPE_MUSIC
       if (CServiceBroker::GetPlaylistPlayer().GetCurrentPlaylist() == PLAYLIST::TYPE_MUSIC)
       {
-        value = (CServiceBroker::GetPlaylistPlayer().GetCurrentSong() <
+        value = (CServiceBroker::GetPlaylistPlayer().GetCurrentItemIdx() <
                  (CServiceBroker::GetPlaylistPlayer().GetPlaylist(PLAYLIST::TYPE_MUSIC).size() -
                   1)); // not last song
         return true;
@@ -676,7 +681,7 @@ bool CMusicGUIInfo::GetBool(bool& value, const CGUIListItem *gitem, int contextW
           value = false;
           return true;
         }
-        index += CServiceBroker::GetPlaylistPlayer().GetCurrentSong();
+        index += CServiceBroker::GetPlaylistPlayer().GetCurrentItemIdx();
       }
       value =
           (index >= 0 &&

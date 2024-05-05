@@ -20,12 +20,11 @@
 #include "utils/GlobalsHandling.h"
 #include "utils/Stopwatch.h"
 #include "windowing/Resolution.h"
-#include "windowing/XBMC_events.h"
 
 #include <atomic>
 #include <chrono>
-#include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -71,7 +70,7 @@ namespace ActiveAE
   class CActiveAE;
 }
 
-namespace VIDEO
+namespace KODI::VIDEO
 {
   class CVideoInfoScanner;
 }
@@ -88,8 +87,6 @@ class CApplication : public IWindowManagerCallback,
                      public CApplicationPlayerCallback,
                      public CApplicationSettingsHandling
 {
-friend class CAppInboundProtocol;
-
 public:
 
   // If playback time of current item is greater than this value, ACTION_PREV_ITEM will seek to start
@@ -129,7 +126,10 @@ public:
                                PLAYLIST::CPlayList& playlist,
                                PLAYLIST::Id playlistId,
                                int track = 0);
-  bool PlayFile(CFileItem item, const std::string& player, bool bRestart = false);
+  bool PlayFile(CFileItem item,
+                const std::string& player,
+                bool bRestart = false,
+                bool forceSelection = false);
   void StopPlaying();
   void Restart(bool bSamePosition = true);
   void DelayedPlayerRestart();
@@ -167,9 +167,9 @@ public:
 
   void UpdateCurrentPlayArt();
 
-  bool ExecuteXBMCAction(std::string action, const CGUIListItemPtr &item = NULL);
+  bool ExecuteXBMCAction(std::string action, const std::shared_ptr<CGUIListItem>& item = NULL);
 
-#ifdef HAS_DVD_DRIVE
+#ifdef HAS_OPTICAL_DRIVE
   std::unique_ptr<MEDIA_DETECT::CAutorun> m_Autorun;
 #endif
 
@@ -200,16 +200,11 @@ protected:
   bool OnSettingsSaving() const override;
   void PlaybackCleanup();
 
-  // inbound protocol
-  bool OnEvent(XBMC_Event& newEvent);
-
   std::shared_ptr<ANNOUNCEMENT::CAnnouncementManager> m_pAnnouncementManager;
   std::unique_ptr<CGUIComponent> m_pGUI;
   std::unique_ptr<CWinSystemBase> m_pWinSystem;
   std::unique_ptr<ActiveAE::CActiveAE> m_pActiveAE;
   std::shared_ptr<CAppInboundProtocol> m_pAppPort;
-  std::deque<XBMC_Event> m_portEvents;
-  CCriticalSection m_portSection;
 
   // timer information
   CStopWatch m_restartPlayerTimer;
@@ -224,12 +219,11 @@ protected:
 
   std::chrono::time_point<std::chrono::steady_clock> m_lastRenderTime;
   bool m_skipGuiRender = false;
+  std::optional<bool> m_guiRenderLastState;
 
   std::unique_ptr<MUSIC_INFO::CMusicInfoScanner> m_musicInfoScanner;
 
   bool PlayStack(CFileItem& item, bool bRestart);
-
-  void HandlePortEvents();
 
   std::unique_ptr<CInertialScrollingHandler> m_pInertialScrollingHandler;
 
@@ -251,6 +245,8 @@ private:
   unsigned int m_ProcessedExternalCalls = 0;      /*!< counts calls which are processed during one "door open" cycle in FrameMove */
   unsigned int m_ProcessedExternalDecay = 0;      /*!< counts to close door after a few frames of no python activity */
   int m_ExitCode{EXITCODE_QUIT};
+  std::shared_ptr<CFileItem> m_itemCurrentFile; //!< Currently playing file
+  CEvent m_playerEvent;
 };
 
 XBMC_GLOBAL_REF(CApplication,g_application);

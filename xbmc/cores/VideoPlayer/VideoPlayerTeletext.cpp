@@ -15,6 +15,8 @@
 
 #include <mutex>
 
+using namespace std::chrono_literals;
+
 const uint8_t rev_lut[32] =
 {
   0x00,0x08,0x04,0x0c, /*  upper nibble */
@@ -230,7 +232,7 @@ void CDVDTeletextData::Process()
   {
     std::shared_ptr<CDVDMsg> pMsg;
     int iPriority = (m_speed == DVD_PLAYSPEED_PAUSE) ? 1 : 0;
-    MsgQueueReturnCode ret = m_messageQueue.Get(pMsg, 2000, iPriority);
+    MsgQueueReturnCode ret = m_messageQueue.Get(pMsg, 2s, iPriority);
 
     if (ret == MSGQ_TIMEOUT)
     {
@@ -359,8 +361,12 @@ void CDVDTeletextData::Process()
               b1 = dehamming[vtxt_row[9]];
               if (b1 != 0xFF)
               {
-                pageinfo_thread->nationalvalid = 1;
-                pageinfo_thread->national = rev_lut[b1] & 0x07;
+                int countryCode = rev_lut[b1] & 0x07;
+                if (countryCode != NAT_DEFAULT)
+                {
+                  pageinfo_thread->nationalvalid = 1;
+                  pageinfo_thread->national = countryCode;
+                }
               }
 
               if (dehamming[vtxt_row[7]] & 0x08)// subtitle page
@@ -581,10 +587,11 @@ void CDVDTeletextData::Process()
                 {
                   int t1 = CDVDTeletextTools::deh24(&vtxt_row[7-4]);
                   pageinfo_thread->function = t1 & 0x0f;
-                  if (!pageinfo_thread->nationalvalid)
+                  int countryCode = (t1 >> 4) & 0x07;
+                  if (!pageinfo_thread->nationalvalid && countryCode != NAT_DEFAULT)
                   {
                     pageinfo_thread->nationalvalid = 1;
-                    pageinfo_thread->national = (t1>>4) & 0x07;
+                    pageinfo_thread->national = countryCode;
                   }
                 }
 

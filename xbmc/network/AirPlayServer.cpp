@@ -12,6 +12,7 @@
 #include "AirPlayServer.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "URL.h"
 #include "application/ApplicationComponents.h"
@@ -318,7 +319,6 @@ CAirPlayServer::CAirPlayServer(int port, bool nonlocal) : CThread("AirPlayServer
 {
   m_port = port;
   m_nonlocal = nonlocal;
-  m_ServerSockets = std::vector<SOCKET>();
   m_usePassword = false;
   m_origVolume = -1;
   CServiceBroker::GetAnnouncementManager()->AddAnnouncer(this);

@@ -10,6 +10,7 @@
 
 #include "CurlFile.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "URL.h"
 #include "settings/AdvancedSettings.h"
@@ -175,7 +176,7 @@ static void ParseItemMRSS(CFileItem* item, SResources& resources, TiXmlElement* 
     else if(scheme == "urn:boxee:season")
       vtag->m_iSeason  = atoi(text.c_str());
     else if(scheme == "urn:boxee:show-title")
-      vtag->m_strShowTitle = text.c_str();
+      vtag->m_strShowTitle = text;
     else if(scheme == "urn:boxee:view-count")
       vtag->SetPlayCount(atoi(text.c_str()));
     else if(scheme == "urn:boxee:source")

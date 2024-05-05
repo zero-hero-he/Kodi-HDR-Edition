@@ -75,12 +75,19 @@ bool CGUIDialogTeletext::OnMessage(CGUIMessage& message)
 
 void CGUIDialogTeletext::Process(unsigned int currentTime, CDirtyRegionList &dirtyregions)
 {
+  if (m_TextDecoder.Changed())
+  {
+    MarkDirtyRegion();
+  }
   CGUIDialog::Process(currentTime, dirtyregions);
   m_renderRegion = m_vertCoords;
 }
 
 void CGUIDialogTeletext::Render()
 {
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() ==
+      RENDER_ORDER_FRONT_TO_BACK)
+    return;
   // Do not render if we have no texture
   if (!m_pTxtTexture)
   {
@@ -120,7 +127,7 @@ void CGUIDialogTeletext::Render()
 
   UTILS::COLOR::Color color =
       (static_cast<UTILS::COLOR::Color>(teletextFadeAmount * 2.55f) & 0xff) << 24 | 0xFFFFFF;
-  CGUITexture::DrawQuad(m_vertCoords, color, m_pTxtTexture.get());
+  CGUITexture::DrawQuad(m_vertCoords, color, m_pTxtTexture.get(), nullptr, -1.0f);
 
   CGUIDialog::Render();
 }

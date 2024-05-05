@@ -39,11 +39,8 @@ CActiveAEStream::CActiveAEStream(AEAudioFormat* format, unsigned int streamid, C
   m_streamIsBuffering = false;
   m_streamIsFlushed = false;
   m_streamSlave = NULL;
-  m_leftoverBuffer = new uint8_t[m_format.m_frameSize];
   m_leftoverBytes = 0;
   m_forceResampler = false;
-  m_remapper = NULL;
-  m_remapBuffer = NULL;
   m_streamResampleRatio = 1.0;
   m_streamResampleMode = 0;
   m_profile = 0;
@@ -53,13 +50,6 @@ CActiveAEStream::CActiveAEStream(AEAudioFormat* format, unsigned int streamid, C
   m_lastPts = 0;
   m_lastPtsJump = 0;
   m_clockSpeed = 1.0;
-}
-
-CActiveAEStream::~CActiveAEStream()
-{
-  delete [] m_leftoverBuffer;
-  delete m_remapper;
-  delete m_remapBuffer;
 }
 
 void CActiveAEStream::IncFreeBuffers()
@@ -162,7 +152,9 @@ void CActiveAEStream::InitRemapper()
                      false);
 
     // extra sound packet, we can't resample to the same buffer
-    m_remapBuffer = new CSoundPacket(m_inputBuffers->m_allSamples[0]->pkt->config, m_inputBuffers->m_allSamples[0]->pkt->max_nb_samples);
+    m_remapBuffer =
+        std::make_unique<CSoundPacket>(m_inputBuffers->m_allSamples[0]->pkt->config,
+                                       m_inputBuffers->m_allSamples[0]->pkt->max_nb_samples);
   }
 }
 
@@ -180,9 +172,7 @@ void CActiveAEStream::RemapBuffer()
     }
 
     // swap sound packets
-    CSoundPacket *tmp = m_currentBuffer->pkt;
-    m_currentBuffer->pkt = m_remapBuffer;
-    m_remapBuffer = tmp;
+    std::swap(m_currentBuffer->pkt, m_remapBuffer);
   }
 }
 
@@ -404,9 +394,8 @@ void CActiveAEStream::Drain(bool wait)
   m_streamDrained = false;
 
   Message *reply;
-  if (m_streamPort->SendOutMessageSync(CActiveAEDataProtocol::DRAINSTREAM,
-                                       &reply,2000,
-                                       &stream, sizeof(CActiveAEStream*)))
+  if (m_streamPort->SendOutMessageSync(CActiveAEDataProtocol::DRAINSTREAM, &reply, 2s, &stream,
+                                       sizeof(CActiveAEStream*)))
   {
     bool success = reply->signal == CActiveAEDataProtocol::ACC ? true : false;
     reply->Release();
@@ -593,11 +582,11 @@ void CActiveAEStream::RegisterSlave(IAEStream *slave)
 CActiveAEStreamBuffers::CActiveAEStreamBuffers(const AEAudioFormat& inputFormat,
                                                const AEAudioFormat& outputFormat,
                                                AEQuality quality)
-  : m_inputFormat(inputFormat)
+  : m_inputFormat(inputFormat),
+    m_resampleBuffers(
+        std::make_unique<CActiveAEBufferPoolResample>(inputFormat, outputFormat, quality)),
+    m_atempoBuffers(std::make_unique<CActiveAEBufferPoolAtempo>(outputFormat))
 {
-  m_resampleBuffers =
-      std::make_unique<CActiveAEBufferPoolResample>(inputFormat, outputFormat, quality);
-  m_atempoBuffers = std::make_unique<CActiveAEBufferPoolAtempo>(outputFormat);
 }
 
 CActiveAEStreamBuffers::~CActiveAEStreamBuffers()

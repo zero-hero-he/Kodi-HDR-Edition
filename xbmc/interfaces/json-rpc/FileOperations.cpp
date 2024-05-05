@@ -10,6 +10,7 @@
 
 #include "AudioLibrary.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "MediaSource.h"
 #include "ServiceBroker.h"
 #include "URL.h"
@@ -25,6 +26,8 @@
 #include "utils/URIUtils.h"
 #include "utils/Variant.h"
 #include "video/VideoDatabase.h"
+
+#include <memory>
 
 using namespace XFILE;
 using namespace JSONRPC;
@@ -44,7 +47,7 @@ JSONRPC_STATUS CFileOperations::GetRootDirectory(const std::string &method, ITra
       if (sources->at(i).m_iHasLock == LOCK_STATE_LOCKED)
         continue;
 
-      items.Add(CFileItemPtr(new CFileItem(sources->at(i))));
+      items.Add(std::make_shared<CFileItem>(sources->at(i)));
     }
 
     for (unsigned int i = 0; i < (unsigned int)items.Size(); i++)
@@ -184,7 +187,7 @@ JSONRPC_STATUS CFileOperations::GetFileDetails(const std::string &method, ITrans
   if (CDirectory::GetDirectory(path, items, "", DIR_FLAG_DEFAULTS) && items.Contains(file))
     item = items.Get(file);
   else
-    item = CFileItemPtr(new CFileItem(file, false));
+    item = std::make_shared<CFileItem>(file, false);
 
   if (!URIUtils::IsUPnP(file))
     FillFileItem(item, item, parameterObject["media"].asString(), parameterObject);

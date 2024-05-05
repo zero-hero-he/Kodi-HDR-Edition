@@ -9,10 +9,14 @@
 #include "PictureInfoLoader.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "PictureInfoTag.h"
 #include "ServiceBroker.h"
 #include "settings/Settings.h"
 #include "settings/SettingsComponent.h"
+#include "video/VideoFileItemClassify.h"
+
+using namespace KODI;
 
 CPictureInfoLoader::CPictureInfoLoader()
 {
@@ -50,7 +54,8 @@ bool CPictureInfoLoader::LoadItem(CFileItem* pItem)
 
 bool CPictureInfoLoader::LoadItemCached(CFileItem* pItem)
 {
-  if (!pItem->IsPicture() || pItem->IsZIP() || pItem->IsRAR() || pItem->IsCBR() || pItem->IsCBZ() || pItem->IsInternetStream() || pItem->IsVideo())
+  if (!pItem->IsPicture() || pItem->IsZIP() || pItem->IsRAR() || pItem->IsCBR() || pItem->IsCBZ() ||
+      pItem->IsInternetStream() || VIDEO::IsVideo(*pItem))
     return false;
 
   if (pItem->HasPictureInfoTag())
@@ -73,7 +78,8 @@ bool CPictureInfoLoader::LoadItemLookup(CFileItem* pItem)
   if (m_pProgressCallback && !pItem->m_bIsFolder)
     m_pProgressCallback->SetProgressAdvance();
 
-  if (!pItem->IsPicture() || pItem->IsZIP() || pItem->IsRAR() || pItem->IsCBR() || pItem->IsCBZ() || pItem->IsInternetStream() || pItem->IsVideo())
+  if (!pItem->IsPicture() || pItem->IsZIP() || pItem->IsRAR() || pItem->IsCBR() || pItem->IsCBZ() ||
+      pItem->IsInternetStream() || VIDEO::IsVideo(*pItem))
     return false;
 
   if (pItem->HasPictureInfoTag())

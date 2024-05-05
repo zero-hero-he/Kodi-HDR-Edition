@@ -48,46 +48,49 @@ public:
    \sa PlayNext
    */
   bool PlayPrevious();
-  bool PlaySongId(int songId);
+  bool PlayItemIdx(int itemIdx);
   bool Play();
 
   /*!
    * \brief Creates a new playlist for an item and starts playing it
    * \param pItem The item to play.
    * \param player The player name.
+   * \param forceSelection for Blurays, force simple menu to change playlist (default to false)
    * \return True if has success, otherwise false.
    */
-  bool Play(const CFileItemPtr& pItem, const std::string& player);
+  bool Play(const CFileItemPtr& pItem, const std::string& player, bool forceSelection = false);
 
   /*! \brief Start playing a particular entry in the current playlist
    \param index the index of the item to play. This value is modified to ensure it lies within the current playlist.
    \param replace whether this item should replace the currently playing item. See CApplication::PlayFile (defaults to false).
    \param playPreviousOnFail whether to go back to the previous item if playback fails (default to false)
+   \param forceSelection for Blurays, force simple menu to change playlist (default to false)
    */
   bool Play(int index,
             const std::string& player,
             bool replace = false,
-            bool playPreviousOnFail = false);
+            bool playPreviousOnFail = false,
+            bool forceSelection = false);
 
   /*! \brief Returns the index of the current item in active playlist.
    \return Current item in the active playlist.
-   \sa SetCurrentSong
+   \sa SetCurrentItemIdx
    */
-  int GetCurrentSong() const;
+  int GetCurrentItemIdx() const;
 
   /*! \brief Change the current item in the active playlist.
    \param index item index in playlist. Set only if the index is within the range of the current playlist.
-   \sa GetCurrentSong
+   \sa GetCurrentItemIdx
    */
-  void SetCurrentSong(int index);
+  void SetCurrentItemIdx(int index);
 
-  int GetNextSong();
+  int GetNextItemIdx();
 
   /*! \brief Get the index in the playlist that is offset away from the current index in the current playlist.
    Obeys any repeat settings (eg repeat one will return the current index regardless of offset)
    \return the index of the entry, or -1 if there is no current playlist. There is no guarantee that the returned index is valid.
    */
-  int GetNextSong(int offset) const;
+  int GetNextItemIdx(int offset) const;
 
   /*! \brief Set the active playlist
    \param id Values can be PLAYLIST::TYPE_NONE, PLAYLIST::TYPE_MUSIC or PLAYLIST::TYPE_VIDEO

@@ -33,11 +33,15 @@
 #include "windowing/GraphicContext.h"
 #include "windowing/WinSystem.h"
 
-#include <locale.h>
-#include <mutex>
-
 #ifdef TARGET_DARWIN_OSX
 #include "platform/darwin/osx/CocoaInterface.h"
+#endif
+
+#include <locale.h>
+#include <memory>
+#include <mutex>
+
+#if defined(TARGET_DARWIN_OSX)
 #include <CoreVideo/CoreVideo.h>
 #include <OpenGL/CGLIOSurface.h>
 #endif
@@ -112,14 +116,14 @@ CLinuxRendererGL::CLinuxRendererGL()
   m_iFlags = 0;
   m_format = AV_PIX_FMT_NONE;
 
-  m_useDithering = CServiceBroker::GetSettingsComponent()->GetSettings()->GetBool("videoscreen.dither");
-  m_ditherDepth = CServiceBroker::GetSettingsComponent()->GetSettings()->GetInt("videoscreen.ditherdepth");
+  std::tie(m_useDithering, m_ditherDepth) = CServiceBroker::GetWinSystem()->GetDitherSettings();
+
   m_fullRange = !CServiceBroker::GetWinSystem()->UseLimitedColor();
 
   m_fbo.width = 0.0;
   m_fbo.height = 0.0;
 
-  m_ColorManager.reset(new CColorManager());
+  m_ColorManager = std::make_unique<CColorManager>();
   m_tCLUTTex = 0;
   m_CLUT = NULL;
   m_CLUTsize = 0;
@@ -210,8 +214,7 @@ bool CLinuxRendererGL::Configure(const VideoPicture &picture, float fps, unsigne
   m_iFlags = GetFlagsChromaPosition(picture.chroma_position) |
              GetFlagsStereoMode(picture.stereoMode);
 
-  m_srcPrimaries = GetSrcPrimaries(static_cast<AVColorPrimaries>(picture.color_primaries),
-                                   picture.iWidth, picture.iHeight);
+  m_srcPrimaries = picture.color_primaries;
   m_toneMap = false;
 
   // Calculate the input frame aspect ratio.
@@ -273,8 +276,8 @@ void CLinuxRendererGL::AddVideoPicture(const VideoPicture &picture, int index)
   buf.videoBuffer = picture.videoBuffer;
   buf.videoBuffer->Acquire();
   buf.loaded = false;
-  buf.m_srcPrimaries = static_cast<AVColorPrimaries>(picture.color_primaries);
-  buf.m_srcColSpace = static_cast<AVColorSpace>(picture.color_space);
+  buf.m_srcPrimaries = picture.color_primaries;
+  buf.m_srcColSpace = picture.color_space;
   buf.m_srcFullRange = picture.color_range == 1;
   buf.m_srcBits = picture.colorBits;
 
@@ -528,9 +531,56 @@ void CLinuxRendererGL::RenderUpdate(int index, int index2, bool clear, unsigned 
 void CLinuxRendererGL::ClearBackBuffer()
 {
   //set the entire backbuffer to black
-  glClearColor(m_clearColour, m_clearColour, m_clearColour, 0);
-  glClear(GL_COLOR_BUFFER_BIT);
-  glClearColor(0,0,0,0);
+  //if we do a two pass render, we have to draw a quad. else we might occlude OSD elements.
+  if (CServiceBroker::GetWinSystem()->GetGfxContext().GetRenderOrder() ==
+      RENDER_ORDER_ALL_BACK_TO_FRONT)
+  {
+    CServiceBroker::GetWinSystem()->GetGfxContext().Clear(0xff000000);
+  }
+  else
+  {
+    ClearBackBufferQuad();
+  }
+}
+
+void CLinuxRendererGL::ClearBackBufferQuad()
+{
+  CRect windowRect(0, 0, CServiceBroker::GetWinSystem()->GetGfxContext().GetWidth(),
+                   CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight());
+  struct Svertex
+  {
+    float x, y;
+  };
+
+  std::vector<Svertex> vertices{
+      {windowRect.x1, windowRect.y2 * 2},
+      {windowRect.x1, windowRect.y1},
+      {windowRect.x2 * 2, windowRect.y1},
+  };
+
+  glDisable(GL_BLEND);
+
+  m_renderSystem->EnableShader(ShaderMethodGL::SM_DEFAULT);
+  GLint posLoc = m_renderSystem->ShaderGetPos();
+  GLint uniCol = m_renderSystem->ShaderGetUniCol();
+
+  glUniform4f(uniCol, m_clearColour / 255.0f, m_clearColour / 255.0f, m_clearColour / 255.0f, 1.0f);
+
+  GLuint vertexVBO;
+  glGenBuffers(1, &vertexVBO);
+  glBindBuffer(GL_ARRAY_BUFFER, vertexVBO);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(Svertex) * vertices.size(), vertices.data(), GL_STATIC_DRAW);
+
+  glVertexAttribPointer(posLoc, 2, GL_FLOAT, GL_FALSE, sizeof(Svertex), 0);
+  glEnableVertexAttribArray(posLoc);
+
+  glDrawArrays(GL_TRIANGLES, 0, vertices.size());
+
+  glDisableVertexAttribArray(posLoc);
+  glBindBuffer(GL_ARRAY_BUFFER, 0);
+  glDeleteBuffers(1, &vertexVBO);
+
+  m_renderSystem->DisableShader();
 }
 
 //draw black bars around the video quad, this is more efficient than glClear()
@@ -1044,8 +1094,6 @@ void CLinuxRendererGL::RenderSinglePass(int index, int field)
     LoadShaders(field);
   }
 
-  glDisable(GL_DEPTH_TEST);
-
   // Y
   glActiveTexture(GL_TEXTURE0);
   glBindTexture(m_textureTarget, planes[0].id);
@@ -1215,8 +1263,6 @@ void CLinuxRendererGL::RenderToFBO(int index, int field, bool weave /*= false*/)
       return;
     }
   }
-
-  glDisable(GL_DEPTH_TEST);
 
   // Y
   glActiveTexture(GL_TEXTURE0);
@@ -1659,7 +1705,7 @@ void CLinuxRendererGL::RenderRGB(int index, int field)
   glBindTexture(m_textureTarget, 0);
 }
 
-bool CLinuxRendererGL::RenderCapture(CRenderCapture* capture)
+bool CLinuxRendererGL::RenderCapture(int index, CRenderCapture* capture)
 {
   if (!m_bValidated)
     return false;
@@ -1685,7 +1731,7 @@ bool CLinuxRendererGL::RenderCapture(CRenderCapture* capture)
 
   capture->BeginRender();
 
-  Render(RENDER_FLAG_NOOSD, m_iYV12RenderBuffer);
+  Render(RENDER_FLAG_NOOSD, index);
   // read pixels
   glReadPixels(0, CServiceBroker::GetWinSystem()->GetGfxContext().GetHeight() - capture->GetHeight(), capture->GetWidth(), capture->GetHeight(),
                GL_BGRA, GL_UNSIGNED_BYTE, capture->GetRenderBuffer());
@@ -2714,10 +2760,9 @@ void CLinuxRendererGL::CheckVideoParameters(int index)
   const CPictureBuffer& buf = m_buffers[index];
   ETONEMAPMETHOD method = m_videoSettings.m_ToneMapMethod;
 
-  AVColorPrimaries srcPrim = GetSrcPrimaries(buf.m_srcPrimaries, buf.image.width, buf.image.height);
-  if (srcPrim != m_srcPrimaries)
+  if (buf.m_srcPrimaries != m_srcPrimaries)
   {
-    m_srcPrimaries = srcPrim;
+    m_srcPrimaries = buf.m_srcPrimaries;
     m_reloadShaders = true;
   }
 
@@ -2736,19 +2781,6 @@ void CLinuxRendererGL::CheckVideoParameters(int index)
   }
   m_toneMap = toneMap;
   m_toneMapMethod = method;
-}
-
-AVColorPrimaries CLinuxRendererGL::GetSrcPrimaries(AVColorPrimaries srcPrimaries, unsigned int width, unsigned int height)
-{
-  AVColorPrimaries ret = srcPrimaries;
-  if (ret == AVCOL_PRI_UNSPECIFIED)
-  {
-    if (width > 1024 || height >= 600)
-      ret = AVCOL_PRI_BT709;
-    else
-      ret = AVCOL_PRI_BT470BG;
-  }
-  return ret;
 }
 
 CRenderCapture* CLinuxRendererGL::GetRenderCapture()

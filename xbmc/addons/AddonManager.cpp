@@ -10,6 +10,7 @@
 
 #include "CompileInfo.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "LangInfo.h"
 #include "ServiceBroker.h"
 #include "addons/AddonBuilder.h"
@@ -249,7 +250,6 @@ std::vector<std::shared_ptr<IAddon>> CAddonMgr::GetOutdatedAddons() const
 std::vector<std::shared_ptr<IAddon>> CAddonMgr::GetAvailableUpdatesOrOutdatedAddons(
     AddonCheckType addonCheckType) const
 {
-  std::unique_lock<CCriticalSection> lock(m_critSection);
   auto start = std::chrono::steady_clock::now();
 
   std::vector<std::shared_ptr<IAddon>> result;
@@ -901,7 +901,7 @@ bool CAddonMgr::EnableSingle(const std::string& id)
 
   auto eventLog = CServiceBroker::GetEventLog();
 
-  if (!IsCompatible(*addon))
+  if (!IsCompatible(addon))
   {
     CLog::Log(LOGERROR, "Add-on '{}' is not compatible with Kodi", addon->ID());
     if (eventLog)
@@ -1111,9 +1111,9 @@ void CAddonMgr::PublishInstanceRemoved(const std::string& addonId, AddonInstance
   m_events.Publish(AddonEvents::InstanceRemoved(addonId, instanceId));
 }
 
-bool CAddonMgr::IsCompatible(const IAddon& addon) const
+bool CAddonMgr::IsCompatible(const std::shared_ptr<const IAddon>& addon) const
 {
-  for (const auto& dependency : addon.GetDependencies())
+  for (const auto& dependency : addon->GetDependencies())
   {
     if (!dependency.optional)
     {
@@ -1122,10 +1122,10 @@ bool CAddonMgr::IsCompatible(const IAddon& addon) const
       if (StringUtils::StartsWith(dependency.id, "xbmc.") ||
           StringUtils::StartsWith(dependency.id, "kodi."))
       {
-        AddonPtr addon;
-        bool haveAddon =
-            GetAddon(dependency.id, addon, AddonType::UNKNOWN, OnlyEnabled::CHOICE_YES);
-        if (!haveAddon || !addon->MeetsVersion(dependency.versionMin, dependency.version))
+        std::shared_ptr<IAddon> dep;
+        const bool haveDependency =
+            GetAddon(dependency.id, dep, AddonType::UNKNOWN, OnlyEnabled::CHOICE_YES);
+        if (!haveDependency || !dep->MeetsVersion(dependency.versionMin, dependency.version))
           return false;
       }
     }

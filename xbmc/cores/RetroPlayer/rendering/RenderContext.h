@@ -17,6 +17,7 @@ class CCriticalSection;
 class CDisplaySettings;
 class CGameSettings;
 class CGraphicContext;
+class CGUIComponent;
 class CGUIShaderDX;
 class CMediaSettings;
 class CRenderSystemBase;
@@ -47,11 +48,13 @@ public:
                  CGraphicContext& graphicsContext,
                  CDisplaySettings& displaySettings,
                  CMediaSettings& mediaSettings,
-                 GAME::CGameServices& gameServices);
+                 GAME::CGameServices& gameServices,
+                 CGUIComponent* guiComponent);
 
   CRenderSystemBase* Rendering() { return m_rendering; }
   CWinSystemBase* Windowing() { return m_windowing; }
   CGraphicContext& GraphicsContext() { return m_graphicsContext; }
+  CGUIComponent* GUI() { return m_guiComponent; }
 
   // Rendering functions
   void SetViewPort(const CRect& viewPort);
@@ -66,6 +69,7 @@ public:
   int GUIShaderGetPos();
   int GUIShaderGetCoord0();
   int GUIShaderGetUniCol();
+  int GUIShaderGetDepth();
 
   // DirectX rendering functions
   CGUIShaderDX* GetGUIShader();
@@ -102,8 +106,8 @@ public:
   ::CGameSettings& GetDefaultGameSettings();
 
   // Agent functions
-  void StartAgentManager(GAME::GameClientPtr gameClient);
-  void StopAgentManager();
+  void StartAgentInput(GAME::GameClientPtr gameClient);
+  void StopAgentInput();
 
 private:
   // Construction parameters
@@ -113,6 +117,7 @@ private:
   CDisplaySettings& m_displaySettings;
   CMediaSettings& m_mediaSettings;
   GAME::CGameServices& m_gameServices;
+  CGUIComponent* const m_guiComponent;
 };
 } // namespace RETRO
 } // namespace KODI

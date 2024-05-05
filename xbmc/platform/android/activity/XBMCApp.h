@@ -81,7 +81,7 @@ private:
 };
 
 class CXBMCApp : public IActivityHandler,
-                 public CJNIMainActivity,
+                 public jni::CJNIMainActivity,
                  public CJNIBroadcastReceiver,
                  public ANNOUNCEMENT::IAnnouncer,
                  public CJNISurfaceHolderCallback
@@ -124,8 +124,6 @@ public:
   jni::jhobject getDisplayListener() { return m_displayListener.get_raw(); }
 
   bool isValid() { return m_activity != NULL; }
-
-  int32_t GetSDKVersion() const { return m_activity->sdkVersion; }
 
   void onStart() override;
   void onResume() override;
@@ -181,7 +179,6 @@ public:
   static float GetSystemVolume();
   static void SetSystemVolume(float percent);
 
-  void SetRefreshRate(float rate);
   void SetDisplayMode(int mode, float rate);
   int GetDPI() const;
 
@@ -235,16 +232,15 @@ private:
 
   CXBMCApp(ANativeActivity* nativeActivity, IInputHandler& inputhandler);
 
-  CJNIXBMCAudioManagerOnAudioFocusChangeListener m_audioFocusListener;
-  CJNIXBMCDisplayManagerDisplayListener m_displayListener;
-  std::unique_ptr<CJNIXBMCMainView> m_mainView;
+  jni::CJNIXBMCAudioManagerOnAudioFocusChangeListener m_audioFocusListener;
+  jni::CJNIXBMCDisplayManagerDisplayListener m_displayListener;
+  std::unique_ptr<jni::CJNIXBMCMainView> m_mainView;
   std::unique_ptr<jni::CJNIXBMCMediaSession> m_mediaSession;
   std::string GetFilenameFromIntent(const CJNIIntent &intent);
 
   void run();
   void stop();
   void SetupEnv();
-  static void SetRefreshRateCallback(void* rateVariant);
   static void SetDisplayModeCallback(void* modeVariant);
   static void KeepScreenOnCallback(void* onVariant);
 
@@ -257,6 +253,10 @@ private:
   bool m_hasFocus{false};
   bool m_headsetPlugged{false};
   bool m_hdmiSource{false};
+  bool m_wakeUp{false};
+  bool m_aeReset{false};
+  bool m_hdmiPlugged{true};
+  bool m_mediaSessionUpdated{false};
   IInputDeviceCallbacks* m_inputDeviceCallbacks{nullptr};
   IInputDeviceEventHandler* m_inputDeviceEventHandler{nullptr};
   bool m_hasReqVisible{false};
@@ -278,6 +278,9 @@ private:
 
   bool XBMC_DestroyDisplay();
   bool XBMC_SetupDisplay();
+
+  void OnSleep();
+  void OnWakeup();
 
   uint32_t m_playback_state{0};
   int64_t m_frameTimeNanos{0};

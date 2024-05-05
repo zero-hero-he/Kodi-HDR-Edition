@@ -9,10 +9,13 @@
 #include "TextureOperations.h"
 
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "ServiceBroker.h"
 #include "TextureCache.h"
 #include "TextureDatabase.h"
 #include "utils/Variant.h"
+
+#include <algorithm>
 
 using namespace JSONRPC;
 

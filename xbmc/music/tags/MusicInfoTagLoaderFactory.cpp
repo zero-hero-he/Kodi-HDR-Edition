@@ -18,9 +18,11 @@
 #include "addons/AudioDecoder.h"
 #include "addons/ExtsMimeSupportList.h"
 #include "addons/addoninfo/AddonType.h"
+#include "music/MusicFileItemClassify.h"
 #include "utils/StringUtils.h"
 #include "utils/URIUtils.h"
 
+using namespace KODI;
 using namespace KODI::ADDONS;
 using namespace MUSIC_INFO;
 
@@ -34,7 +36,7 @@ IMusicInfoTagLoader* CMusicInfoTagLoaderFactory::CreateLoader(const CFileItem& i
   if (item.IsInternetStream())
     return NULL;
 
-  if (item.IsMusicDb())
+  if (MUSIC::IsMusicDb(item))
     return new CMusicInfoTagLoaderDatabase();
 
   std::string strExtension = URIUtils::GetExtension(item.GetPath());
@@ -70,7 +72,7 @@ IMusicInfoTagLoader* CMusicInfoTagLoaderFactory::CreateLoader(const CFileItem& i
     CTagLoaderTagLib *pTagLoader = new CTagLoaderTagLib();
     return pTagLoader;
   }
-#ifdef HAS_DVD_DRIVE
+#ifdef HAS_OPTICAL_DRIVE
   else if (strExtension == "cdda")
   {
     CMusicInfoTagLoaderCDDA *pTagLoader = new CMusicInfoTagLoaderCDDA();

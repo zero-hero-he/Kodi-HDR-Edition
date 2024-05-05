@@ -10,6 +10,7 @@
 
 #include "DbUrl.h"
 #include "FileItem.h"
+#include "FileItemList.h"
 #include "GUIUserMessages.h"
 #include "ServiceBroker.h"
 #include "XBDateTime.h"
@@ -437,9 +438,9 @@ void CGUIDialogMediaFilter::InitializeSettings()
         value = filter.rule->m_operator == CDatabaseQueryRule::OPERATOR_TRUE ? CHECK_YES : CHECK_NO;
 
       TranslatableIntegerSettingOptions entries;
-      entries.push_back(TranslatableIntegerSettingOption(CHECK_LABEL_ALL, CHECK_ALL));
-      entries.push_back(TranslatableIntegerSettingOption(CHECK_LABEL_NO, CHECK_NO));
-      entries.push_back(TranslatableIntegerSettingOption(CHECK_LABEL_YES, CHECK_YES));
+      entries.emplace_back(CHECK_LABEL_ALL, CHECK_ALL);
+      entries.emplace_back(CHECK_LABEL_NO, CHECK_NO);
+      entries.emplace_back(CHECK_LABEL_YES, CHECK_YES);
 
       filter.setting = AddSpinner(group, settingId, filter.label, SettingLevel::Basic, value, entries, true);
     }

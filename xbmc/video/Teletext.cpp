@@ -18,7 +18,9 @@
 #include "application/ApplicationComponents.h"
 #include "application/ApplicationPlayer.h"
 #include "filesystem/SpecialProtocol.h"
-#include "input/Key.h"
+#include "input/actions/Action.h"
+#include "input/actions/ActionIDs.h"
+#include "input/keyboard/KeyIDs.h"
 #include "utils/log.h"
 #include "windowing/GraphicContext.h"
 
@@ -447,6 +449,25 @@ CTeletextDecoder::CTeletextDecoder()
 
 CTeletextDecoder::~CTeletextDecoder() = default;
 
+bool CTeletextDecoder::Changed()
+{
+  std::unique_lock<CCriticalSection> lock(m_txtCache->m_critSection);
+  if (IsSubtitlePage(m_txtCache->Page))
+  {
+    m_updateTexture = true;
+    return true;
+  }
+
+  /* Update on every changed second */
+  if (m_txtCache->TimeString[7] != prevTimeSec)
+  {
+    prevTimeSec = m_txtCache->TimeString[7];
+    m_updateTexture = true;
+    return true;
+  }
+  return false;
+}
+
 bool CTeletextDecoder::HandleAction(const CAction &action)
 {
   if (m_txtCache == NULL)
@@ -484,7 +505,7 @@ bool CTeletextDecoder::HandleAction(const CAction &action)
       m_RenderInfo.PosY = 0;
       char ns[10];
       SetPosX(1);
-      sprintf(ns,"+%d    ", m_RenderInfo.SubtitleDelay);
+      snprintf(ns, sizeof(ns), "+%d    ", m_RenderInfo.SubtitleDelay);
       RenderCharFB(ns[0], &Text_AtrTable[ATR_WB]);
       RenderCharFB(ns[1], &Text_AtrTable[ATR_WB]);
       RenderCharFB(ns[2], &Text_AtrTable[ATR_WB]);
@@ -508,7 +529,7 @@ bool CTeletextDecoder::HandleAction(const CAction &action)
         m_RenderInfo.PosY = 0;
         char ns[10];
         SetPosX(1);
-        sprintf(ns,"+%d    ", m_RenderInfo.SubtitleDelay);
+        snprintf(ns, sizeof(ns), "+%d    ", m_RenderInfo.SubtitleDelay);
         RenderCharFB(ns[0], &Text_AtrTable[ATR_WB]);
         RenderCharFB(ns[1], &Text_AtrTable[ATR_WB]);
         RenderCharFB(ns[2], &Text_AtrTable[ATR_WB]);
@@ -1320,20 +1341,6 @@ void CTeletextDecoder::RenderPage()
         {
           SetPosX(33+i);
         }
-      }
-
-      if (!IsSubtitlePage(m_txtCache->Page))
-      {
-        /* Update on every changed second */
-        if (m_txtCache->TimeString[7] != prevTimeSec)
-        {
-          prevTimeSec = m_txtCache->TimeString[7];
-          m_updateTexture = true;
-        }
-      }
-      else
-      {
-        m_updateTexture = true;
       }
     }
     DoFlashing(StartRow);
@@ -3812,7 +3819,6 @@ int CTeletextDecoder::Eval_Triplet(int iOData, TextCachedPage_t *pstCachedPage,
       {
 
         int c = *pAPx0 + (*endcol == 40 ? *pAPx : 0);  /* current column */
-        int c1 = offset;
         TextPageAttr_t *p = &PageAtrb[offset];
         do
         {
@@ -3842,7 +3848,6 @@ int CTeletextDecoder::Eval_Triplet(int iOData, TextCachedPage_t *pstCachedPage,
           if (bw) p->IgnoreAtBlackBgSubst = 0;
           p++;
           c++;
-          c1++;
         } while (c < *endcol);
       }
       break;

@@ -8,6 +8,10 @@
 
 #include "PlatformLinux.h"
 
+#include "ServiceBroker.h"
+#include "application/AppParams.h"
+#include "filesystem/SpecialProtocol.h"
+
 #if defined(HAS_ALSA)
 #include "cores/AudioEngine/Sinks/alsa/ALSADeviceMonitor.h"
 #include "cores/AudioEngine/Sinks/alsa/ALSAHControlMonitor.h"
@@ -49,10 +53,12 @@
 
 #include <cstdlib>
 
+#ifndef TARGET_WEBOS
 CPlatform* CPlatform::CreateInstance()
 {
   return new CPlatformLinux();
 }
+#endif
 
 bool CPlatformLinux::InitStageOne()
 {
@@ -85,36 +91,34 @@ bool CPlatformLinux::InitStageOne()
 #endif
 #endif
 
-  CLinuxPowerSyscall::Register();
+  RegisterPowerManagement();
 
-  std::string envSink;
-  if (getenv("KODI_AE_SINK"))
-    envSink = getenv("KODI_AE_SINK");
+  std::string_view sink = CServiceBroker::GetAppParams()->GetAudioBackend();
 
-  if (StringUtils::EqualsNoCase(envSink, "ALSA"))
+  if (sink == "alsa")
   {
     OPTIONALS::ALSARegister();
   }
-  else if (StringUtils::EqualsNoCase(envSink, "PULSE"))
+  else if (sink == "pulseaudio")
   {
-    OPTIONALS::PulseAudioRegister();
+    OPTIONALS::PulseAudioRegister(true);
   }
-  else if (StringUtils::EqualsNoCase(envSink, "PIPEWIRE"))
+  else if (sink == "pipewire")
   {
     OPTIONALS::PipewireRegister();
   }
-  else if (StringUtils::EqualsNoCase(envSink, "SNDIO"))
+  else if (sink == "sndio")
   {
     OPTIONALS::SndioRegister();
   }
-  else if (StringUtils::EqualsNoCase(envSink, "ALSA+PULSE"))
+  else if (sink == "alsa+pulseaudio")
   {
     OPTIONALS::ALSARegister();
-    OPTIONALS::PulseAudioRegister();
+    OPTIONALS::PulseAudioRegister(true);
   }
   else
   {
-    if (!OPTIONALS::PulseAudioRegister())
+    if (!OPTIONALS::PulseAudioRegister(false))
     {
       if (!OPTIONALS::PipewireRegister())
       {
@@ -160,4 +164,9 @@ bool CPlatformLinux::IsConfigureAddonsAtStartupEnabled()
 #else
   return false;
 #endif
+}
+
+void CPlatformLinux::RegisterPowerManagement()
+{
+  CLinuxPowerSyscall::Register();
 }

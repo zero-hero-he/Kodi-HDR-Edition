@@ -67,8 +67,12 @@ class CGUITexture;
 
 using CreateGUITextureFunc = std::function<CGUITexture*(
     float posX, float posY, float width, float height, const CTextureInfo& texture)>;
-using DrawQuadFunc = std::function<void(
-    const CRect& coords, UTILS::COLOR::Color color, CTexture* texture, const CRect* texCoords)>;
+using DrawQuadFunc = std::function<void(const CRect& coords,
+                                        UTILS::COLOR::Color color,
+                                        CTexture* texture,
+                                        const CRect* texCoords,
+                                        const float depth,
+                                        const bool blending)>;
 
 class CGUITexture
 {
@@ -85,10 +89,12 @@ public:
   static void DrawQuad(const CRect& coords,
                        UTILS::COLOR::Color color,
                        CTexture* texture = nullptr,
-                       const CRect* texCoords = nullptr);
+                       const CRect* texCoords = nullptr,
+                       const float depth = 1.0,
+                       const bool blending = true);
 
   bool Process(unsigned int currentTime);
-  void Render();
+  void Render(int32_t depthOffset = 0, int32_t overrideDepth = -1);
 
   void DynamicResourceAlloc(bool bOnOff);
   bool AllocResources();
@@ -116,6 +122,12 @@ public:
   const CRect& GetRenderRect() const { return m_vertex; }
   bool IsLazyLoaded() const { return m_info.useLarge; }
 
+  /*!
+   * @brief Get the diffuse color (info color) associated to this texture
+   * @return the infocolor associated to this texture
+  */
+  KODI::GUILIB::GUIINFO::CGUIInfoColor GetDiffuseColor() const { return m_info.diffuseColor; }
+
   bool HitTest(const CPoint& point) const
   {
     return CRect(m_posX, m_posY, m_posX + m_width, m_posY + m_height).PtInRect(point);
@@ -132,7 +144,6 @@ protected:
   CGUITexture(const CGUITexture& left);
 
   bool CalculateSize();
-  void LoadDiffuseImage();
   bool AllocateOnDemand();
   bool UpdateAnimFrame(unsigned int currentTime);
   void Render(float left,
@@ -167,6 +178,7 @@ protected:
   float m_posY;
   float m_width;
   float m_height;
+  float m_depth{0};
 
   CRect m_vertex;       // vertex coords to render
   bool m_invalid;       // if true, we need to recalculate

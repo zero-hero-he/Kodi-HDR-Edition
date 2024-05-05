@@ -37,7 +37,7 @@ void CGraphicContext::SetOrigin(float x, float y)
   if (!m_origins.empty())
     m_origins.push(CPoint(x,y) + m_origins.top());
   else
-    m_origins.push(CPoint(x,y));
+    m_origins.emplace(x, y);
 
   AddTransform(TransformMatrix::CreateTranslation(x, y));
 }
@@ -580,6 +580,11 @@ void CGraphicContext::ResetScreenParameters(RESOLUTION res)
   ResetOverscan(res, info.Overscan);
 }
 
+void CGraphicContext::Clear()
+{
+  CServiceBroker::GetRenderSystem()->InvalidateColorBuffer();
+}
+
 void CGraphicContext::Clear(UTILS::COLOR::Color color)
 {
   CServiceBroker::GetRenderSystem()->ClearBuffers(color);
@@ -718,10 +723,10 @@ void CGraphicContext::SetScalingResolution(const RESOLUTION_INFO &res, bool need
   // reset our origin and camera
   while (!m_origins.empty())
     m_origins.pop();
-  m_origins.push(CPoint(0, 0));
+  m_origins.emplace(.0f, .0f);
   while (!m_cameras.empty())
     m_cameras.pop();
-  m_cameras.push(CPoint(0.5f*m_iScreenWidth, 0.5f*m_iScreenHeight));
+  m_cameras.emplace(0.5f * m_iScreenWidth, 0.5f * m_iScreenHeight);
   while (!m_stereoFactors.empty())
     m_stereoFactors.pop();
   m_stereoFactors.push(0.0f);
@@ -820,6 +825,22 @@ void CGraphicContext::RestoreStereoFactor()
   assert(m_stereoFactors.size());
   m_stereoFactors.pop();
   UpdateCameraPosition(m_cameras.top(), m_stereoFactors.top());
+}
+
+float CGraphicContext::GetNormalizedDepth(uint32_t depth)
+{
+  float normalizedDepth = static_cast<float>(depth);
+  normalizedDepth /= m_layer;
+  normalizedDepth = normalizedDepth * 2 - 1;
+  return normalizedDepth;
+}
+
+float CGraphicContext::GetTransformDepth(int32_t depthOffset)
+{
+  float depth = static_cast<float>(m_finalTransform.matrix.depth + depthOffset);
+  depth /= m_layer;
+  depth = depth * 2 - 1;
+  return depth;
 }
 
 CRect CGraphicContext::GenerateAABB(const CRect &rect) const
@@ -1004,6 +1025,24 @@ void CGraphicContext::GetAllowedResolutions(std::vector<RESOLUTION> &res)
   {
     res.push_back((RESOLUTION) r);
   }
+}
+
+void CGraphicContext::SetRenderOrder(RENDER_ORDER renderOrder)
+{
+  m_renderOrder = renderOrder;
+  if (renderOrder == RENDER_ORDER_ALL_BACK_TO_FRONT)
+    CServiceBroker::GetRenderSystem()->SetDepthCulling(DEPTH_CULLING_OFF);
+  else if (renderOrder == RENDER_ORDER_BACK_TO_FRONT)
+    CServiceBroker::GetRenderSystem()->SetDepthCulling(DEPTH_CULLING_BACK_TO_FRONT);
+  else if (renderOrder == RENDER_ORDER_FRONT_TO_BACK)
+    CServiceBroker::GetRenderSystem()->SetDepthCulling(DEPTH_CULLING_FRONT_TO_BACK);
+}
+
+uint32_t CGraphicContext::GetDepth(uint32_t addLayers)
+{
+  uint32_t layer = m_layer;
+  m_layer += addLayers;
+  return layer;
 }
 
 void CGraphicContext::SetFPS(float fps)
